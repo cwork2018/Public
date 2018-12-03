@@ -5,49 +5,50 @@ import cupy as cp
 try:
   import cupy.cuda.device
   print("cupy import [ok]")
+  bcupy = True
 except ImportError:
   print("cupy import [error]")
+  bcupy = False
+
+bcupy = False
+print("bcupy=[%s]" % bcupy)
 
 nloopa = 5
-nloopb = 300
+nloopb = 30
 
-def f_cal(ff, ii,mi,mc,mj):
-  maa = ff.arange(mi*mc).reshape(mi,mc) / float(mi*mc) + (float(ii) * 0.1)
-  #mbb = 0.001 + ff.sin(ff.arange(mc*mj).reshape(mc,mj) * 0.1)
-  mbb = ff.sin(ff.arange(mc*mj).reshape(mc,mj) * 0.1)
+def f_cal(ff, ii,mc):
+  maa = ff.arange(mc*mc).reshape(mc,mc) / float(mc*mc) + (float(ii) * 0.1)
+  mbb = ff.sin(ff.arange(mc*mc).reshape(mc,mc) * 0.1)
+  #maa = ff.zeros((mc,mc)) + 0.0
+  #mbb = ff.zeros((mc,mc)) + 0.0
 
   tstart = time.time()
   #-------------- start --------------
-  #mpp = maa.reshape(-1,mc)
-  #mqq = mbb.reshape(mc,-1)
-  #mrlta = ff.dot(mpp, mqq); mrlta = mrlta.reshape(mi,mj)
-  #asum = ff.sum(mrlta)
-  for jj in range(nloopb):
-    mpp = maa.reshape(-1,mc)
-    mqq = mbb.reshape(mc,-1)
-    mrlta = ff.dot(mpp, mqq)
-    maa = mrlta.reshape(mi,mj)
-  asum = ff.sum(mrlta)
+  for jj in range(nloopb): maa = ff.dot(maa, mbb)
   #-------------- end --------------
   tend = time.time()
+  asum = ff.sum(maa)
   return tend-tstart, asum
 
-nn = 1000
-mdd = np.dot(np.arange(nn*nn).reshape(nn,nn), np.arange(nn*nn).reshape(nn,nn))
-mdd = cp.dot(cp.arange(nn*nn).reshape(nn,nn), cp.arange(nn*nn).reshape(nn,nn))
-
-#ni,nc,nj = 5000, 10000, 1000
-ni,nc,nj = 1000, 1000, 1000
+#nc = 5000
+nc = 2000
 
 for iloop in range(nloopa):
-  #mi,mc,mj = ni,nc,nj
   kk = 100
-  mi,mc,mj = ni+iloop*kk, nc+iloop*kk, nj+iloop*kk
+  mc = nc+iloop*kk
 
-  dtb, sumb = f_cal(cp, iloop,mi,mc,mj)
-  dta, suma = f_cal(np, iloop,mi,mc,mj)
-  ratio = min(10000, dta / (dtb + 1.0e-30))
-  err = suma-sumb
+  nsize_gb = 2*mc*mc*8 * 1e-9
 
-  print("iloop=[%2d] [%d,%d]x[%d,%d]x%d dtime_{numpy,cupy}=[%12.9g %12.9g] r=[%7.1f] sum=[%.7g %.7g %.7g]" \
-    % (iloop, mi,mc,mc,mj,nloopb, dta,dtb, ratio, suma,sumb,err))
+  if bcupy:
+    dta, suma = f_cal(np, iloop,mc)
+    dtb, sumb = f_cal(cp, iloop,mc)
+    ratio = min(10000, dta / (dtb + 1.0e-30))
+    err = suma-sumb
+  
+    print("iloop=[%2d] [%d,%d]x[%d,%d]x%d mem= %7.3fgb dtime_{numpy,cupy}=[%7.3f %9.6f] r=[%7.1f] sum=[%.7g %.7g %.7g]" \
+      % (iloop, mc,mc,mc,mc,nloopb, nsize_gb, dta,dtb, ratio, suma,sumb,err))
+
+  else:
+    dta, suma = f_cal(np, iloop,mc)
+    print("iloop=[%2d] [%d,%d]x[%d,%d]x%d mem= %7.3fgb dtime_{numpy}=[%7.3f] sum=[%.7g]" \
+      % (iloop, mc,mc,mc,mc,nloopb, nsize_gb, dta, suma))
