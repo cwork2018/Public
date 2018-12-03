@@ -10,8 +10,8 @@ except ImportError:
   print("cupy import [error]")
   bcupy = False
 
-bcupy = False
-print("bcupy=[%s]" % bcupy)
+#bcupy = False
+#print("bcupy=[%s]" % bcupy)
 
 nloopa = 5
 nloopb = 30
